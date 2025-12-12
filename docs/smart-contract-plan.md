@@ -2246,6 +2246,34 @@ const handleTrade = async () => {
 
 ## Testnet Deployment Plan
 
+### Current implementation (contracts workspace)
+
+The repo now includes a standalone Hardhat + TypeScript workspace at `./contracts` implementing the CPMM core suite:
+
+- `MarketFactory.sol`
+- `CPMMMarket.sol`
+- `CollateralVault.sol`
+- `ResolutionOracle.sol`
+- `libraries/CPMMMath.sol`
+
+For Arbitrum Sepolia deployment:
+
+```bash
+cd contracts
+npm install
+cp .env.example .env
+npm run deploy:arbitrumSepolia
+```
+
+- Deployed addresses are written to `contracts/deployments/arbitrumSepolia.json`.
+- Minimal ABIs are exported to `contracts/artifacts/abi/*.json`.
+
+**Arbitrum Sepolia addresses (fill in after deploy):**
+
+- `CollateralVault`: `TBD`
+- `ResolutionOracle`: `TBD`
+- `MarketFactory`: `TBD`
+
 ### Pre-Deployment Checklist
 
 **1. Contract Preparation**
