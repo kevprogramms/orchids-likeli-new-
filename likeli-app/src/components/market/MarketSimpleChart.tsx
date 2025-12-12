@@ -2,16 +2,12 @@
 
 import { useMemo, useState } from "react";
 import clsx from "clsx";
-import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    Tooltip,
-    ResponsiveContainer,
-    CartesianGrid,
-    ReferenceLine,
-} from "recharts";
+import { Group } from "@visx/group";
+import { GridRows } from "@visx/grid";
+import { AxisBottom, AxisRight } from "@visx/axis";
+import { scaleLinear, scaleTime } from "@visx/scale";
+import { LinePath } from "@visx/shape";
+import { curveLinear } from "@visx/curve";
 
 // Generic type for the history we receive
 interface HistoryPoint {
@@ -31,10 +27,15 @@ interface MarketSimpleChartProps {
 
 type TimeFrame = "1H" | "6H" | "1D" | "1W" | "1M" | "ALL";
 
+const width = 1007;
+const height = 250;
+const margin = { top: 10, right: 50, bottom: 40, left: 10 };
+
 export default function MarketSimpleChart({ priceHistory, mode = "simple" }: MarketSimpleChartProps) {
     const [timeFrame, setTimeFrame] = useState<TimeFrame>("ALL");
+    const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; date: string } | null>(null);
 
-    const { chartData, yDomain } = useMemo(() => {
+    const { chartData, xScale, yScale, lastPoint } = useMemo(() => {
         const rawHistory = priceHistory ?? [];
 
         // Sort by timestamp
@@ -69,66 +70,46 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
 
             return {
                 timestamp: p.timestamp,
-                probYesPct: probYes * 100,
-                probNoPct: probNo * 100,
+                probYes: probYes,
             };
         });
 
         if (data.length === 0) {
             data.push({
                 timestamp: Date.now(),
-                probYesPct: 50,
-                probNoPct: 50,
+                probYes: 0.5,
             });
         }
 
-        // X-axis: let chart auto-fill (no fixed air gap)
-        // Use 'auto' domain so Recharts fills the width with data
-        const allValues = data.flatMap(p => [p.probYesPct, p.probNoPct]);
+        // Calculate scales
+        const xMin = data[0].timestamp;
+        const xMax = data[data.length - 1].timestamp;
+        
+        const xScale = scaleTime({
+            domain: [xMin, xMax],
+            range: [margin.left, width - margin.right],
+        });
+
+        // Y scale - 20% to 60% like Kalshi example
+        const allValues = data.map(d => d.probYes * 100);
         const minVal = Math.min(...allValues);
         const maxVal = Math.max(...allValues);
-        const padding = 5; // 5% padding
+        const padding = 5;
         const yMin = Math.max(0, Math.floor(minVal - padding));
         const yMax = Math.min(100, Math.ceil(maxVal + padding));
-        const yDomain: [number, number] = isFinite(yMin) && isFinite(yMax) && yMax > yMin
-            ? [yMin, yMax]
-            : [0, 100];
 
-        return { chartData: data, yDomain };
+        const yScale = scaleLinear({
+            domain: [yMax, yMin], // Inverted for SVG
+            range: [margin.top, height - margin.bottom],
+        });
+
+        const lastPoint = data[data.length - 1];
+
+        return { chartData: data, xScale, yScale, lastPoint };
     }, [priceHistory, timeFrame]);
 
-    const lastIndex = chartData.length - 1;
-
-    // Get last values for labels
-    const lastYesPct = chartData[lastIndex]?.probYesPct ?? 50;
-    const lastNoPct = chartData[lastIndex]?.probNoPct ?? 50;
-
-    // Custom dot that only renders on the last point with label like Kalshi
-    const LastDotYes = (props: any) => {
-        const { cx, cy, index } = props;
-        if (index !== lastIndex || !cx || !cy) return null;
-        return (
-            <g>
-                <circle cx={cx} cy={cy} r={5} fill="#3b82f6" stroke="#fff" strokeWidth={2} />
-                <text x={cx + 12} y={cy + 4} fill="#3b82f6" fontSize={12} fontWeight={600}>
-                    {lastYesPct.toFixed(0)}%
-                </text>
-            </g>
-        );
-    };
-
-    const LastDotNo = (props: any) => {
-        const { cx, cy, index } = props;
-        if (index !== lastIndex || !cx || !cy) return null;
-        return (
-            <g>
-                <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />
-                <text x={cx + 12} y={cy + 4} fill="#ef4444" fontSize={12} fontWeight={600}>
-                    {lastNoPct.toFixed(0)}%
-                </text>
-            </g>
-        );
-    };
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
 
     const formatDate = (ts: number) => {
         const date = new Date(ts);
@@ -142,8 +123,18 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-        });
+        }).toUpperCase();
     };
+
+    // Calculate tick values for X axis (5 ticks)
+    const xTicks = useMemo(() => {
+        if (chartData.length === 0) return [];
+        const timestamps = chartData.map(d => d.timestamp);
+        const min = timestamps[0];
+        const max = timestamps[timestamps.length - 1];
+        const step = (max - min) / 4;
+        return [min, min + step, min + step * 2, min + step * 3, max];
+    }, [chartData]);
 
     return (
         <div className="w-full flex flex-col">
@@ -165,75 +156,120 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
                 ))}
             </div>
 
-            {/* Chart Panel - Light grey background matching UI */}
+            {/* Chart Panel */}
             <div
-                className="w-full rounded-xl border border-[var(--border-subtle)]"
+                className="w-full rounded-xl border border-[var(--border-subtle)] relative"
                 style={{
                     backgroundColor: "var(--bg-panel)",
                     padding: "20px",
                 }}
             >
-                <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={chartData} margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
-                        <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
-
-                        <XAxis
-                            dataKey="timestamp"
-                            tickFormatter={formatDate}
-                            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                            axisLine={{ stroke: "var(--border-subtle)" }}
-                            tickLine={false}
-                            minTickGap={50}
+                <svg width={width} height={height}>
+                    <Group>
+                        {/* Grid rows */}
+                        <GridRows
+                            scale={yScale}
+                            width={innerWidth}
+                            height={innerHeight}
+                            stroke="var(--border-subtle)"
+                            strokeOpacity={0.3}
+                            numTicks={5}
                         />
 
-                        <YAxis
-                            orientation="right"
-                            domain={yDomain}
-                            tickFormatter={(v: number) => `${v}%`}
-                            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                            axisLine={false}
-                            tickLine={false}
-                            width={45}
+                        {/* Bottom Axis */}
+                        <AxisBottom
+                            top={height - margin.bottom}
+                            scale={xScale}
+                            tickValues={xTicks}
+                            tickFormat={formatDate}
+                            stroke="var(--border-subtle)"
+                            tickStroke="transparent"
+                            tickLabelProps={() => ({
+                                fill: "var(--text-muted)",
+                                fontSize: 11,
+                                textAnchor: "middle",
+                            })}
                         />
 
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: "var(--bg-panel)",
-                                border: "1px solid var(--border-subtle)",
-                                borderRadius: 8,
-                                boxShadow: "var(--shadow-md)",
-                            }}
-                            labelFormatter={formatDateFull}
-                            formatter={(value: number, name: string) => [
-                                `${value.toFixed(1)}%`,
-                                name === "probYesPct" ? "YES" : "NO"
-                            ]}
+                        {/* Right Axis */}
+                        <AxisRight
+                            left={width - margin.right}
+                            scale={yScale}
+                            numTicks={5}
+                            tickFormat={(v: any) => `${v}%`}
+                            stroke="transparent"
+                            tickStroke="transparent"
+                            tickLabelProps={() => ({
+                                fill: "var(--text-muted)",
+                                fontSize: 11,
+                                textAnchor: "start",
+                                dx: 5,
+                            })}
                         />
 
-                        {/* YES line with live dot - linear for Kalshi/Polymarket style */}
-                        <Line
-                            type="linear"
-                            dataKey="probYesPct"
+                        {/* Line path */}
+                        <LinePath
+                            data={chartData}
+                            x={(d) => xScale(d.timestamp)}
+                            y={(d) => yScale(d.probYes * 100)}
                             stroke="#3b82f6"
                             strokeWidth={2.5}
-                            dot={<LastDotYes />}
-                            activeDot={{ r: 6, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
-                            isAnimationActive={false}
+                            curve={curveLinear}
                         />
 
-                        {/* NO line (dashed) with live dot - linear for Kalshi/Polymarket style */}
-                        <Line
-                            type="linear"
-                            dataKey="probNoPct"
-                            stroke="#ef4444"
-                            strokeWidth={2}
-                            strokeDasharray="5 3"
-                            dot={<LastDotNo />}
-                            activeDot={{ r: 6, fill: "#ef4444", stroke: "#fff", strokeWidth: 2 }}
-                            isAnimationActive={false}
-                        />
-                    </LineChart>
-                </ResponsiveContainer>
+                        {/* Last point circle with pulse animation */}
+                        {lastPoint && (
+                            <>
+                                <circle
+                                    cx={xScale(lastPoint.timestamp)}
+                                    cy={yScale(lastPoint.probYes * 100)}
+                                    r={6}
+                                    fill="#3b82f6"
+                                    stroke="#fff"
+                                    strokeWidth={2}
+                                    style={{
+                                        animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                                    }}
+                                />
+                                {/* Date label */}
+                                <text
+                                    x={xScale(lastPoint.timestamp)}
+                                    y={yScale(lastPoint.probYes * 100) + 25}
+                                    fill="var(--text-muted)"
+                                    fontSize={11}
+                                    textAnchor="middle"
+                                    fontWeight={500}
+                                >
+                                    {formatDateFull(lastPoint.timestamp)}
+                                </text>
+                            </>
+                        )}
+
+                        {/* Hover line (optional) */}
+                        {hoveredPoint && (
+                            <line
+                                x1={hoveredPoint.x}
+                                x2={hoveredPoint.x}
+                                y1={margin.top}
+                                y2={height - margin.bottom}
+                                stroke="var(--border-subtle)"
+                                strokeWidth={1}
+                                strokeDasharray="4 4"
+                            />
+                        )}
+                    </Group>
+                </svg>
+
+                <style jsx>{`
+                    @keyframes pulse {
+                        0%, 100% {
+                            opacity: 1;
+                        }
+                        50% {
+                            opacity: 0.5;
+                        }
+                    }
+                `}</style>
             </div>
         </div>
     );
