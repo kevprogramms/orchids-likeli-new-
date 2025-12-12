@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const user = userId || "demo-user";
 
         if (!sandboxUsers.has(user)) {
-            sandboxUsers.set(user, { id: user, cash: 1000, positions: {} });
+            sandboxUsers.set(user, { id: user, cash: 10000, positions: {} });
         }
         const currentUser = sandboxUsers.get(user)!;
 
@@ -72,10 +72,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             curve.supply += delta;
             curve.reserve += cost;
 
-            // Update user (mock)
+            // Safeguard: ensure cost is reasonable
+            if (isNaN(cost) || !isFinite(cost) || cost < 0) {
+                console.error('[Trade] Invalid cost calculated:', cost);
+                cost = 0;
+            }
+
+            // Check user has enough balance before deducting
+            if (currentUser.cash < cost) {
+                return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
+            }
+
+            // Update user balance
             currentUser.cash -= cost;
             const posKey = `${market.id}-${isYes ? "yes" : "no"}`;
             currentUser.positions[posKey] = (currentUser.positions[posKey] || 0) + delta;
+
+            console.log('[Trade] BUY completed:', { delta, cost, newBalance: currentUser.cash });
 
         } else {
             // SELL
@@ -113,6 +126,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Recompute prices and update history
         recordSandboxPriceSnapshot(market);
 
+        // DEBUG: Log curve state after trade
+        console.log('[Trade DEBUG] After trade:', {
+            side,
+            outcome: outcomeStr,
+            delta,
+            cost: side === 'BUY' ? cost : payout,
+            yesCurve: { supply: market.curve.yes.supply, reserve: market.curve.yes.reserve, maxSupply: market.curve.yes.maxSupply },
+            noCurve: { supply: market.curve.no.supply, reserve: market.curve.no.reserve, maxSupply: market.curve.no.maxSupply },
+            yesPrice: getProbability(market).yesPrice,
+            noPrice: getProbability(market).noPrice,
+            probYes: getProbability(market).probYes,
+        });
+
         // Write back
         sandboxMarkets.set(id, market);
         sandboxUsers.set(user, currentUser);
@@ -123,7 +149,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({
             market,
             position: currentUser.positions,
-            currentPrices
+            currentPrices,
+            userCash: currentUser.cash  // Return current balance
         });
 
     } catch (e) {

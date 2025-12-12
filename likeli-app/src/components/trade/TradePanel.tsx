@@ -26,8 +26,8 @@ export default function TradePanel({ mode, market, onOrderPlaced, currentPrice =
     const [yesPriceState, setYesPriceState] = useState(market?.currentPrices?.probYes ?? currentPrice);
     const [noPriceState, setNoPriceState] = useState(market?.currentPrices?.probNo ?? (1 - currentPrice));
 
-    // Hardcode balance for demo
-    const balance = 1000.00;
+    // Dynamic balance - starts at $10,000, updates from trade response
+    const [balance, setBalance] = useState(10000.00);
 
     // Display Price
     const displayPrice = outcomeId === 'yes' ? yesPriceState : noPriceState;
@@ -134,6 +134,10 @@ export default function TradePanel({ mode, market, onOrderPlaced, currentPrice =
                 setYesPriceState(json.currentPrices.probYes);
                 setNoPriceState(json.currentPrices.probNo);
             }
+            // Update balance from response if available
+            if (json.userCash !== undefined) {
+                setBalance(json.userCash);
+            }
             if (onOrderPlaced) onOrderPlaced();
 
         } catch (e) {
@@ -143,8 +147,12 @@ export default function TradePanel({ mode, market, onOrderPlaced, currentPrice =
     };
 
     const setMax = () => {
-        // Mock setMax since we don't have real balance yet, just fill 100
-        setAmount("100");
+        // Set amount to full balance for buy, or estimate shares for sell
+        if (tradeSide === 'BUY') {
+            setAmount(balance.toFixed(2));
+        } else {
+            setAmount("100"); // For sell, use a reasonable default
+        }
     };
 
     return (

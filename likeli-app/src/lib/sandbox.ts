@@ -94,10 +94,15 @@ export function sellPayout(outcome: OutcomeCurve, delta: number): number {
 export function getProbability(market: SandboxMarket) {
     const yesPrice = curvePrice(market.curve.yes);
     const noPrice = curvePrice(market.curve.no);
-    // Avoid div by zero
-    const total = (yesPrice + noPrice) || 1;
-    const probYes = yesPrice / total;
+
+    // Probability derived from actual curve prices (this is how real PMs work)
+    // Trading price = probability
+    // Buy YES → yesPrice ↑ → probYes ↑
+    // Buy NO → noPrice ↑ → probYes ↓ (denominator grows with more NO weight)
+    const total = yesPrice + noPrice;
+    const probYes = total > 0 ? yesPrice / total : 0.5;
     const probNo = 1 - probYes;
+
     return { probYes, probNo, yesPrice, noPrice };
 }
 

@@ -10,6 +10,7 @@ import {
     Tooltip,
     ResponsiveContainer,
     CartesianGrid,
+    ReferenceLine,
 } from "recharts";
 
 // Generic type for the history we receive
@@ -33,7 +34,7 @@ type TimeFrame = "1H" | "6H" | "1D" | "1W" | "1M" | "ALL";
 export default function MarketSimpleChart({ priceHistory, mode = "simple" }: MarketSimpleChartProps) {
     const [timeFrame, setTimeFrame] = useState<TimeFrame>("ALL");
 
-    const { chartData, domain } = useMemo(() => {
+    const { chartData, yDomain } = useMemo(() => {
         const rawHistory = priceHistory ?? [];
 
         // Sort by timestamp
@@ -81,33 +82,37 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
             });
         }
 
-        // Dynamic Y-axis domain
+        // X-axis: let chart auto-fill (no fixed air gap)
+        // Use 'auto' domain so Recharts fills the width with data
         const allValues = data.flatMap(p => [p.probYesPct, p.probNoPct]);
         const minVal = Math.min(...allValues);
         const maxVal = Math.max(...allValues);
-
-        const padding = 5;
+        const padding = 5; // 5% padding
         const yMin = Math.max(0, Math.floor(minVal - padding));
         const yMax = Math.min(100, Math.ceil(maxVal + padding));
+        const yDomain: [number, number] = isFinite(yMin) && isFinite(yMax) && yMax > yMin
+            ? [yMin, yMax]
+            : [0, 100];
 
-        const calculatedDomain: [number, number] =
-            isFinite(yMin) && isFinite(yMax) && yMax > yMin
-                ? [yMin, yMax]
-                : [0, 100];
-
-        return { chartData: data, domain: calculatedDomain };
+        return { chartData: data, yDomain };
     }, [priceHistory, timeFrame]);
 
     const lastIndex = chartData.length - 1;
 
-    // Custom dot that only renders on the last point - with pulsing animation
+    // Get last values for labels
+    const lastYesPct = chartData[lastIndex]?.probYesPct ?? 50;
+    const lastNoPct = chartData[lastIndex]?.probNoPct ?? 50;
+
+    // Custom dot that only renders on the last point with label like Kalshi
     const LastDotYes = (props: any) => {
         const { cx, cy, index } = props;
         if (index !== lastIndex || !cx || !cy) return null;
         return (
             <g>
-                <circle cx={cx} cy={cy} r={8} fill="rgba(56, 189, 248, 0.3)" className="animate-ping-slow" />
-                <circle cx={cx} cy={cy} r={5} fill="#38bdf8" stroke="#fff" strokeWidth={2} />
+                <circle cx={cx} cy={cy} r={5} fill="#3b82f6" stroke="#fff" strokeWidth={2} />
+                <text x={cx + 12} y={cy + 4} fill="#3b82f6" fontSize={12} fontWeight={600}>
+                    {lastYesPct.toFixed(0)}%
+                </text>
             </g>
         );
     };
@@ -117,8 +122,10 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
         if (index !== lastIndex || !cx || !cy) return null;
         return (
             <g>
-                <circle cx={cx} cy={cy} r={8} fill="rgba(248, 113, 113, 0.3)" className="animate-ping-slow" />
-                <circle cx={cx} cy={cy} r={5} fill="#f87171" stroke="#fff" strokeWidth={2} />
+                <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />
+                <text x={cx + 12} y={cy + 4} fill="#ef4444" fontSize={12} fontWeight={600}>
+                    {lastNoPct.toFixed(0)}%
+                </text>
             </g>
         );
     };
@@ -167,7 +174,7 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
                 }}
             >
                 <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={chartData} margin={{ top: 10, right: 40, left: 10, bottom: 10 }}>
+                    <LineChart data={chartData} margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
                         <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
 
                         <XAxis
@@ -181,7 +188,7 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
 
                         <YAxis
                             orientation="right"
-                            domain={domain}
+                            domain={yDomain}
                             tickFormatter={(v: number) => `${v}%`}
                             tick={{ fill: "var(--text-muted)", fontSize: 11 }}
                             axisLine={false}
@@ -203,9 +210,9 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
                             ]}
                         />
 
-                        {/* YES line with live dot */}
+                        {/* YES line with live dot - linear for Kalshi/Polymarket style */}
                         <Line
-                            type="monotone"
+                            type="linear"
                             dataKey="probYesPct"
                             stroke="#3b82f6"
                             strokeWidth={2.5}
@@ -214,9 +221,9 @@ export default function MarketSimpleChart({ priceHistory, mode = "simple" }: Mar
                             isAnimationActive={false}
                         />
 
-                        {/* NO line (dashed) with live dot */}
+                        {/* NO line (dashed) with live dot - linear for Kalshi/Polymarket style */}
                         <Line
-                            type="monotone"
+                            type="linear"
                             dataKey="probNoPct"
                             stroke="#ef4444"
                             strokeWidth={2}
