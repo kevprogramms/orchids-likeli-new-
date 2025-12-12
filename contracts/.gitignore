@@ -1,0 +1,12 @@
+node_modules/
+cache/
+coverage/
+coverage.json
+typechain/
+.env
+.DS_Store
+
+# Hardhat build output (keep exported ABIs)
+artifacts/
+!artifacts/abi/
+!artifacts/abi/**

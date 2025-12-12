@@ -1,0 +1,17 @@
+# Root ignores (monorepo)
+
+# OS
+.DS_Store
+
+# Node
+**/node_modules/
+**/.env
+
+# Hardhat (keep exported ABIs)
+contracts/artifacts/
+!contracts/artifacts/abi/
+!contracts/artifacts/abi/**
+contracts/cache/
+
+# Logs
+*.log
