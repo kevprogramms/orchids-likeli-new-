@@ -1,0 +1,7 @@
+{
+  "projectId": "6c74f829-f311-4ea1-b949-99e98d0bd189",
+  "createdAt": 1765552555373,
+  "startupCommands": [
+    "cd likeli-app && bun run dev"
+  ]
+}
