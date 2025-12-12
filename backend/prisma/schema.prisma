@@ -1,0 +1,350 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MarketType {
+  SANDBOX
+  MAIN
+}
+
+enum MarketStatus {
+  ACTIVE
+  RESOLVED
+  VOID
+  GRADUATED
+}
+
+enum Outcome {
+  YES
+  NO
+  VOID
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+enum OrderSide {
+  BID
+  ASK
+}
+
+enum OrderStatus {
+  ACTIVE
+  FILLED
+  CANCELLED
+  PARTIALLY_FILLED
+}
+
+enum TradeType {
+  BUY
+  SELL
+}
+
+enum LiquidityEventType {
+  ADDED
+  REMOVED
+}
+
+enum OracleEventType {
+  PRICE_UPDATE
+  RESOLUTION
+  PRICE_FEED
+}
+
+model Market {
+  id                String         @id @default(cuid())
+  marketId          BigInt         @unique
+  marketAddress     String         @unique
+  type              MarketType
+  status            MarketStatus   @default(ACTIVE)
+  
+  // Market metadata
+  question          String
+  category          String
+  rules             String?
+  resolutionDate    DateTime
+  creator           String
+  
+  // Market state
+  winningOutcome    Outcome?
+  resolvedAt        DateTime?
+  
+  // Trading statistics
+  totalVolume       BigInt         @default(0)
+  totalTrades       BigInt         @default(0)
+  tradeCount        BigInt         @default(0)
+  
+  // Timestamps
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  graduatedAt       DateTime?
+  
+  // Relations
+  priceHistory      PriceSnapshot[]
+  trades            Trade[]
+  liquidityEvents   LiquidityEvent[]
+  orders            Order[]
+  positions         Position[]
+  factoryEvents     MarketFactoryEvent[]
+  
+  @@index([marketId])
+  @@index([marketAddress])
+  @@index([status])
+  @@index([category])
+  @@index([resolutionDate])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderId       BigInt      @unique
+  marketId      String
+  market        Market      @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  // Order details
+  user          String
+  outcome       Outcome
+  side          OrderSide
+  type          OrderType   @default(LIMIT)
+  
+  // Order parameters
+  price         BigInt      // Price in wei (0.01 to 0.99)
+  size          BigInt      // Original size in shares
+  remainingSize BigInt      // Unfilled size
+  
+  // Status
+  status        OrderStatus @default(ACTIVE)
+  filledAt      DateTime?
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  cancelledAt   DateTime?
+  
+  @@index([orderId])
+  @@index([marketId])
+  @@index([user])
+  @@index([outcome])
+  @@index([side])
+  @@index([status])
+  @@index([price])
+}
+
+model Trade {
+  id              String      @id @default(cuid())
+  tradeId         BigInt      @unique
+  marketId        String
+  market          Market      @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  // Trade participants
+  buyer           String
+  seller          String?
+  
+  // Trade details
+  outcome         Outcome
+  side            OrderSide
+  shares          BigInt
+  price           BigInt
+  amount          BigInt      // Total USD amount
+  
+  // Gas and fees
+  gasUsed         BigInt?
+  fee             BigInt      @default(0)
+  
+  // Order matching
+  makerOrderId    BigInt?
+  takerOrderId    BigInt?
+  
+  // Block data
+  blockNumber     BigInt
+  transactionHash String
+  
+  // Timestamps
+  timestamp       DateTime    @default(now())
+  
+  @@index([tradeId])
+  @@index([marketId])
+  @@index([buyer])
+  @@index([seller])
+  @@index([outcome])
+  @@index([timestamp])
+  @@index([blockNumber])
+}
+
+model LiquidityEvent {
+  id              String              @id @default(cuid())
+  eventId         BigInt              @unique
+  marketId        String
+  market          Market              @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  // Event details
+  provider        String
+  eventType       LiquidityEventType
+  amount          BigInt              // USD amount
+  shares          BigInt?             // Shares minted/burned
+  
+  // Block data
+  blockNumber     BigInt
+  transactionHash String
+  
+  // Timestamps
+  timestamp       DateTime            @default(now())
+  
+  @@index([eventId])
+  @@index([marketId])
+  @@index([provider])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+model PriceSnapshot {
+  id              String    @id @default(cuid())
+  marketId        String
+  market          Market    @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  
+  // Price data
+  yesPrice        BigInt    // YES token price
+  noPrice         BigInt    // NO token price
+  yesProbability  BigInt    // Probability percentage (0-100)
+  noProbability   BigInt    // Probability percentage (0-100)
+  
+  // Market depth
+  yesSupply       BigInt    @default(0)
+  noSupply        BigInt    @default(0)
+  yesReserve      BigInt    @default(0)
+  noReserve       BigInt    @default(0)
+  
+  // Timestamps
+  timestamp       DateTime  @default(now())
+  
+  @@index([marketId])
+  @@index([timestamp])
+}
+
+model Position {
+  id              String    @id @default(cuid())
+  marketId        String
+  market          Market    @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  user            String
+  
+  // Position details
+  outcome         Outcome
+  shares          BigInt    @default(0)
+  avgPrice        BigInt    @default(0)
+  
+  // Unrealized P&L
+  unrealizedPnl   BigInt    @default(0)
+  
+  // Realized P&L
+  realizedPnl     BigInt    @default(0)
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([marketId, user, outcome])
+  @@index([user])
+  @@index([marketId])
+}
+
+model CollateralBalance {
+  id              String    @id @default(cuid())
+  user            String    @unique
+  
+  // Balance details
+  freeBalance     BigInt    @default(0)    // Available for trading
+  lockedBalance   BigInt    @default(0)    // In open orders
+  totalDeposited  BigInt    @default(0)
+  totalWithdrawn  BigInt    @default(0)
+  
+  // P&L tracking
+  totalFeesPaid   BigInt    @default(0)
+  realizedPnl     BigInt    @default(0)
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([user])
+}
+
+model OracleState {
+  id              String          @id @default(cuid())
+  oracleAddress   String          @unique
+  marketId        String?         // Optional - some feeds might be global
+  
+  // Oracle details
+  eventType       OracleEventType
+  price           BigInt?
+  confidence      BigInt?         // Confidence level (0-100)
+  dataHash        String?         // Hash of off-chain data
+  
+  // Metadata
+  metadata        Json?           // Additional oracle-specific data
+  
+  // Block data
+  blockNumber     BigInt
+  transactionHash String
+  
+  // Timestamps
+  timestamp       DateTime        @default(now())
+  
+  @@index([oracleAddress])
+  @@index([marketId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+model MarketFactoryEvent {
+  id              String    @id @default(cuid())
+  eventId         BigInt    @unique
+  
+  // Event details
+  eventType       String    // "MarketCreated", "MarketGraduated", etc.
+  marketId        BigInt?
+  marketAddress   String?
+  creator         String?
+  
+  // Event data
+  eventData       Json
+  
+  // Block data
+  blockNumber     BigInt
+  transactionHash String
+  
+  // Timestamps
+  timestamp       DateTime  @default(now())
+  
+  @@index([eventId])
+  @@index([marketId])
+  @@index([eventType])
+  @@index([blockNumber])
+}
+
+model SyncState {
+  id                    String    @id @default("singleton")
+  lastProcessedBlock    BigInt
+  lastProcessedLogIndex BigInt    @default(0)
+  
+  // Indexer status
+  isIndexing            Boolean   @default(false)
+  lastIndexingStart     DateTime?
+  lastIndexingEnd       DateTime?
+  indexerErrors         Json?     // Array of recent errors
+  
+  // Performance metrics
+  totalEventsProcessed  BigInt    @default(0)
+  processingSpeed       Float?    // Events per second
+  
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([lastProcessedBlock])
+}
