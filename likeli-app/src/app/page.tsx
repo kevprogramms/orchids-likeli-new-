@@ -10,7 +10,7 @@ import styles from "./page.module.css";
 import { Search } from "lucide-react";
 import clsx from "clsx";
 
-const CATEGORIES = ["All", "Crypto", "Macro", "Politics", "Sports", "Culture"];
+const CATEGORIES = ["For you", "Crypto", "Macro", "Politics", "Sports", "Culture", "Technology", "Entertainment"];
 
 export default function Home() {
   const { markets } = useStore();
@@ -114,19 +114,6 @@ export default function Home() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-          {/* Filters */}
-          <div className={styles.filters}>
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                className={clsx(styles.filterPill, activeCategory === cat && styles.filterPillActive)}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Header Actions */}
@@ -145,6 +132,26 @@ export default function Home() {
           >
             Create Market
           </button>
+        </div>
+      </div>
+
+      {/* Kalshi-style Horizontal Category Filter */}
+      <div className={styles.categoryFilterWrapper}>
+        <div className={styles.categoryFilterScroller}>
+          <div className={styles.categoryFilterInner}>
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                className={clsx(
+                  styles.categoryButton,
+                  activeCategory === cat && styles.categoryButtonActive
+                )}
+                onClick={() => setActiveCategory(cat === "For you" ? "All" : cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

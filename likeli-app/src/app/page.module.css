@@ -65,73 +65,6 @@
     background: #1f2937;
 }
 
-.controlsRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 16px;
-    margin-bottom: 16px;
-    gap: 12px;
-}
-
-.controlsLeft {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.tabGroup {
-    display: inline-flex;
-    padding: 4px;
-    border-radius: 999px;
-    background: #f3f4f6;
-}
-
-.tab {
-    border: none;
-    background: transparent;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 14px;
-    cursor: pointer;
-    color: #4b5563;
-    transition: all 0.2s ease;
-}
-
-.tabActive {
-    background: #ffffff;
-    box-shadow: 0 0 0 1px #e5e7eb;
-    color: #111827;
-    font-weight: 600;
-}
-
-.headerActions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-}
-
-.btn {
-    border-radius: 999px;
-    padding: 6px 16px;
-    font-size: 14px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btnPrimary {
-    background: #111827;
-    color: #ffffff;
-    border: none;
-}
-
-.btnPrimary:hover {
-    background: #1f2937;
-}
-
 .btnOutline {
     background: transparent;
     color: #111827;
@@ -197,4 +130,69 @@
     background-color: #f3f4f6;
     color: #111827;
     border-color: #e5e7eb;
+}
+
+/* Kalshi-style Horizontal Category Filter */
+.categoryFilterWrapper {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.categoryFilterScroller {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    width: 100%;
+}
+
+.categoryFilterScroller::-webkit-scrollbar {
+    display: none;
+}
+
+.categoryFilterInner {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+    padding: 4px 0;
+}
+
+.categoryButton {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    min-width: 60px;
+    white-space: nowrap;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: opacity 0.083s ease, background-color 0.083s ease, transform 0.167s ease;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    background: transparent;
+    color: var(--text-main);
+    border-color: var(--border-subtle);
+}
+
+.categoryButton:hover {
+    opacity: 0.8;
+    background: var(--bg-panel-hover);
+}
+
+.categoryButton:active {
+    transform: scale(0.9);
+    transition: opacity 0.05s ease, background-color 0.05s ease, transform 0.05s ease;
+}
+
+.categoryButtonActive {
+    color: var(--bg-panel);
+    background: var(--color-primary);
+    border-color: var(--color-primary-hover);
+}
+
+.categoryButtonActive:hover {
+    opacity: 1;
+    background: var(--color-primary-hover);
 }
